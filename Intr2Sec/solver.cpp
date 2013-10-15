@@ -25,51 +25,38 @@ void str2IntVec(vector<int>& vec,const  string& str){
 	
 }
 
-string doTheMagic(const vector<int>& vec1, const vector<int>& vec2){
+vector<int> doTheMagic(const vector<int>& vec1, const vector<int>& vec2){
 	vector<int>::const_iterator it1 = vec1.begin();
 	vector<int>::const_iterator it2 = vec2.begin();
 
-	stringstream ss;
-
+	vector<int> ret;
 	while (it1!=vec1.end() && it2!=vec2.end()){
-		int h = (*it1)^(*it2);
-		
-		/*
-		bitset<8> test1(*it2);
-		bitset<8> test2(*it1);
-		bitset<8> test(h);
-		cout<<test1<<endl;
-		cout<<test2<<endl;
-		cout<<"--------"<<endl;
-		cout<<test<<endl<<endl;
-		*/
+		ret.push_back( (*it1)^(*it2) );
+				
 
 		it1++;
 		it2++;
-		if (h<16)ss<<"0";
-		ss<<hex<<h;
 	}
-	return ss.str();
+	return ret;
 }
 
-string xorStrings(const string& msg,const  string& inp){
-//	string msg = "6162636465";
+
+vector<int> xorStrings(const string& msg,const  string& inp){
 	vector<int> msgInt;
 	vector<int> inpInt;
 	str2IntVec(msgInt, msg);
 	str2IntVec(inpInt, inp);
-//	for (vector<int>::reverse_iterator i=msgInt.rbegin();i!=msgInt.rend();i++){
-//		cout << char(*i)<<endl;
-//		break;
-//	}
 	
 	return doTheMagic(msgInt,inpInt);
 }
-
-
-
-
-
+/*
+void findSpaces(const vector<string>& vec){
+	int space = 0x20;
+	for (vector<int>::const_iterator it = vec.begin(); it!=vec.end();it++){
+		if ((*it)^space==0) cout<<"HEP"<<endl;
+	}
+}
+*/
 int main()
 {
 	ifstream msg1("tmp1.txt");
@@ -84,14 +71,23 @@ int main()
 		inputs.push_back(tmpInp);
 	//	cout<<tmpInp<<endl;
 	}
-	vector<string> xorStr;
+	inp.close();
+
+	vector< vector<int> > xorStr;
 	
 	int i=0;
 	int j=0;
 	for (vector<string>::iterator iter = inputs.begin(); iter!=inputs.end();++iter){
 		xorStr.push_back(xorStrings(msg,*iter));
 	}
-	cout << xorStr[0]<<endl;
+	
+	for (vector<int>::iterator v=xorStr[0].begin();v!=xorStr[0].end();v++){
+		cout<<hex<<(*v)<<endl;
+
+	}
+	
+	//findSpaces(xorStr);
+	
 	return 0;
 }
 
