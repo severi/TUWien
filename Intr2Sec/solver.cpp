@@ -18,9 +18,6 @@ void str2IntVec(vector<int>& vec,const  string& str){
 		ss<<hex<<t1<<t2;
 		ss>>a;
 		vec.push_back(a);
-		//cout << "INT " <<a<<endl;
-		//cout << "HEX " << hex<< a<<endl;
-		//cout << "ASC " << char(a)<<endl<<endl;
 	}	
 	
 }
@@ -32,8 +29,6 @@ vector<int> doTheMagic(const vector<int>& vec1, const vector<int>& vec2){
 	vector<int> ret;
 	while (it1!=vec1.end() && it2!=vec2.end()){
 		ret.push_back( (*it1)^(*it2) );
-				
-
 		it1++;
 		it2++;
 	}
@@ -46,47 +41,60 @@ vector<int> xorStrings(const string& msg,const  string& inp){
 	vector<int> inpInt;
 	str2IntVec(msgInt, msg);
 	str2IntVec(inpInt, inp);
-	
 	return doTheMagic(msgInt,inpInt);
 }
-/*
-void findSpaces(const vector<string>& vec){
-	int space = 0x20;
+
+void findSpaces(const vector<int>& vec){
+	int space = 32;
+	int calc=0;
+	vector<int> pos;
+	int i=0;
 	for (vector<int>::const_iterator it = vec.begin(); it!=vec.end();it++){
-		if ((*it)^space==0) cout<<"HEP"<<endl;
+		int result = (*it)^space;
+
+		if (result==0){
+			++calc;
+			pos.push_back(i);
+		}
+		else if (( result>=65 && result<=90) || ( result>=97 && result<=122)) {
+			//cout<<char(result);
+			pos.push_back(i);
+			++calc;
+		}
+		i++;
+			
 	}
+	for (int j = 0; j<pos.size();j++){
+		cout<<pos[j]<<" ";
+	}	
+	cout<<endl<<"total: "<<calc<<endl<<endl;
 }
-*/
+
 int main()
 {
-	ifstream msg1("tmp1.txt");
+	ifstream msg1("msg.txt");
 	string msg;
 	msg1>>msg;
 	msg1.close();
 
 	vector<string> inputs;
-	ifstream inp("tmp2.txt");
+	ifstream inp("input.txt");
 	string tmpInp;
 	while (inp>>tmpInp) {
 		inputs.push_back(tmpInp);
-	//	cout<<tmpInp<<endl;
 	}
 	inp.close();
 
 	vector< vector<int> > xorStr;
 	
-	int i=0;
-	int j=0;
 	for (vector<string>::iterator iter = inputs.begin(); iter!=inputs.end();++iter){
 		xorStr.push_back(xorStrings(msg,*iter));
 	}
 	
-	for (vector<int>::iterator v=xorStr[0].begin();v!=xorStr[0].end();v++){
-		cout<<hex<<(*v)<<endl;
-
+	for (int i=0;i<xorStr.size();++i){
+		cout << "checkking: "<<i<<endl;
+		findSpaces(xorStr[i]);
 	}
-	
-	//findSpaces(xorStr);
 	
 	return 0;
 }
