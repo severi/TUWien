@@ -79,7 +79,7 @@ def main():
         st=""
         for i in range(len(xor[0])):
             if i in spaceIdx:
-                st+="/";
+                st+="|";
             elif i in t:
                 st+=str(t[i])
             else:
