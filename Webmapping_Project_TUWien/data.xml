@@ -1,0 +1,16 @@
+<markers>
+<marker lat="48.1925507" lng="16.3377495" name="TravelShack" category="Bar" sub_category="Club" desc="A bar" />
+<marker lat="48.2091904" lng="16.3745098" name="Figlmueller" category="Restaurant" sub_category="Austrian" desc="Schnitzel restaurant" />
+<marker lat="48.2112465" lng="16.3789158" name="Wurstelstand" category="Restaurant" sub_category="Fast Food" desc="Käsekrainenr etc" />
+<marker lat="48.1965485" lng="16.3810501" name="Salm Brau" category="Restaurant" sub_category="Austrian" desc="Schnitzel restaurant and brewery" />
+<marker lat="48.1912613" lng="16.3798008" name="Schloss Belvedere" category="Sightseeing" sub_category="Palace" desc="Summer Palace of Prince Eugen" />
+<marker lat="48.1865807" lng="16.3131409" name="Schloss Schönbrunn" category="Sightseeing" sub_category="Palace" desc="Summer Palace" />
+<marker lat="48.2079811" lng="16.3591595" name="Parlament" category="Sightseeing" sub_category="Government" desc="Parlament of Austria" />
+<marker lat="48.2107315" lng="16.3581009" name="Rathaus" category="Sightseeing" sub_category="Government" desc="Rathaus of Vienna" />
+<marker lat="48.2080116" lng="16.3728294" name="Stephansdom" category="Sightseeing" sub_category="Church" desc="Nice Church" />
+<marker lat="48.207634" lng="16.366018" name="Hofburg" category="Sightseeing" sub_category="Palace" desc="Winter Palace" />
+<marker lat="48.205067" lng="16.359967" name="Museum of Natural History" category="Sightseeing" sub_category="Museum" desc="Museum of Natural History of Vienna" />
+<marker lat="48.203873" lng="16.361533" name="Kunst Historisches Museum" category="Sightseeing" sub_category="Museum" desc="Kunst Historisches Museum Wien" />
+<marker lat="48.213758" lng="16.404882" name="Pratersauna" category="Bar" sub_category="Club" desc="Nice club" />
+<marker lat="48.20678" lng="16.360912" name="Volksgarten" category="Bar" sub_category="Club" desc="Club at volksgarten" />
+</markers>
