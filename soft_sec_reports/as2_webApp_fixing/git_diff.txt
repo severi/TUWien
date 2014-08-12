@@ -1,0 +1,567 @@
+diff --git a/backend.php b/backend.php
+index 2602e62..407b59f 100644
+--- a/backend.php
++++ b/backend.php
+@@ -3,35 +3,43 @@
+ define( 'WEB_PAGE_TO_ROOT', '' );
+ 
+ require_once WEB_PAGE_TO_ROOT.'includes/businessPage.inc.php';
+-
++global $_SESSION;
+ startup( array( 'authenticated', 'redirect'=>'backend.php' ) );
+-        
+-	if (isset($_POST['btnSubmit'])) {
+-                        $content = $_POST['mtxContent'];
++
++	if (isset($_POST['btnSubmit']) && $_POST['CSRFToken']==$_SESSION['TOKEN']) {
++            $content = filter_var($_POST['mtxContent'], FILTER_SANITIZE_STRING);
+ 			$target_path = WEB_PAGE_TO_ROOT."uploads/";
+ 			$target_path .= basename( $_FILES['uploaded']['name']);
+-			if(!move_uploaded_file($_FILES['uploaded']['tmp_name'], $target_path)) {
+-				
++
++			$imageData = @getimagesize($_FILES['uploaded']['tmp_name']);
++			if($imageData === FALSE || !($imageData[2] == IMAGETYPE_GIF || $imageData[2] == IMAGETYPE_JPEG || $imageData[2] == IMAGETYPE_PNG)) {
++		      	$html .= '<pre>';
++				$html .= 'Your image was not uploaded - wrong file format.';
++				$html .= '</pre>';
++		    }
++
++			else if(!move_uploaded_file($_FILES['uploaded']['tmp_name'], $target_path)) {
++
+ 				$html .= '<pre>';
+ 				$html .= 'Your image was not uploaded.';
+ 				$html .= '</pre>';
+-				
++
+       		} else {
+                                 $content.="<br /><img heigth=250 width=250 src=\"". $target_path ."\"> ";
+ 				$html .= '<pre>';
+ 				$html .= $target_path . ' succesfully uploaded!';
+ 				$html .= '</pre>';
+-				
++
+ 			}
+                   if(isset($_POST['txtRef']))
+-                      $content.="<br /><a href=\"redirect.php?url=". $_POST['txtRef'] ."\">External Reference </a>";
++                      $content.="<br /><a href=\"".$_POST['txtRef']."\">External Reference </a>";
+                   $title=$_POST['txtTitle'];
+                   $name=$_POST['user'];
+                   $published=gmdate("Y-m-d H:i:s");
+-                databaseConnect();
+-                $query = "INSERT INTO article (headline,content,created,published) VALUES ('$title','$content','$published','$name');";
+-                mysql_query($query) or die('<pre>' . mysql_error() . '</pre>' );
+ 
++                $pdo = databaseConnect1();
++                $stmt = $pdo->prepare('INSERT INTO article (headline,content,created,published) VALUES (:title, :content, :published, :name)');
++				$stmt->execute(array('title' => $title, 'content' => $content, 'published' => $published, 'name' => $name));
+ 		}
+ 
+ $page = grabNewPage();
+@@ -42,9 +50,9 @@ $page[ 'page_id' ] = 'home';
+ 
+ $page[ 'body' ] .= "Welcome to the Management Backend!<br />
+     You can add an article below:<br />
+-    
++
+     <form enctype=\"multipart/form-data\" method=\"post\" name=\"article\">
+-    
++
+     Title *<br /><input name=\"txtTitle\" type=\"text\" size=\"30\" maxlength=\"20\"><br/>
+                 Content *<br/>
+ 		<textarea name=\"mtxContent\" cols=\"500\" rows=\"10\" maxlength=\"5000\"></textarea><br/>
+@@ -54,7 +62,7 @@ $page[ 'body' ] .= "Welcome to the Management Backend!<br />
+                         External Reference *<br /><input name=\"txtRef\" type=\"text\" size=\"30\" maxlength=\"60\"><br/>";
+ $page[ 'body' ] .=getAuthors();
+ $page[ 'body' ] .="<br/><input name=\"btnSubmit\" type=\"submit\" value=\"Submit\"><br/>
+-    
++	<input type=\"hidden\" name=\"CSRFToken\" value=\"".$_SESSION['TOKEN']."\">
+     </form>
+ ";
+ 
+diff --git a/includes/businessPage.inc.php b/includes/businessPage.inc.php
+index 65fa8cb..2c0bd15 100644
+--- a/includes/businessPage.inc.php
++++ b/includes/businessPage.inc.php
+@@ -9,6 +9,20 @@ if( !defined( 'WEB_PAGE_TO_ROOT' ) ) {
+ 
+ 
+ session_start();
++if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 900)) {
++    // last request was more than 15 minutes ago
++    logout();
++}
++$_SESSION['LAST_ACTIVITY'] = time(); // update last activity time stamp
++
++if (!isset($_SESSION['CREATED'])) {
++    $_SESSION['CREATED'] = time();
++    $_SESSION['TOKEN'] = md5(uniqid(rand(), true));
++} else if (time() - $_SESSION['CREATED'] > 900) {
++    // session started more than 15 minutes ago
++    session_regenerate_id(true);    // change session ID for the current session an invalidate old session ID
++    $_SESSION['CREATED'] = time();  // update creation time
++}
+ 
+ $_BUSINESS = array();
+ $_BUSINESS[ 'db_server' ] = 'localhost';
+@@ -23,8 +37,7 @@ if(!isset($html)){
+ 
+ }
+ 
+-
+-// Start session functions -- 
++// Start session functions --
+ 
+ function &sessionGrab() {
+ 
+@@ -56,13 +69,19 @@ function startup( $pActions ) {
+ function login( $pUsername ) {
+ 
+ 	$businessSession =& sessionGrab();
+-        
+-        databaseConnect();
+-        $result = mysql_fetch_row(mysql_query("SELECT user_id FROM users where user='".$pUsername."'"));
+-        
+-        $businessSession['id'] = $result[0];
++
++    $pdo = databaseConnect1();
++	$stmt = $pdo->prepare("SELECT user_id FROM users where user=:uname");
++	$stmt->execute(array('uname' => $pUsername));
++	$result;
++    foreach ($stmt as $row) {
++        $result=$row;
++        break;
++    }
++
++    $businessSession['id'] = $result[0];
+ 	$businessSession['username'] = $pUsername;
+-        $_SESSION['business'] = $businessSession;
++    $_SESSION['business'] = $businessSession;
+ }
+ 
+ 
+@@ -79,9 +98,18 @@ function logout() {
+ 
+ 	$businessSession =& sessionGrab();
+ 
++	unset( $token);
+ 	unset( $businessSession['username'] );
+-        unset( $businessSession['id'] );
+-        session_destroy();
++    unset( $businessSession['id'] );
++
++    if (ini_get("session.use_cookies")) {
++    $params = session_get_cookie_params();
++    setcookie(session_name(), '', time() - 42000,
++        $params["path"], $params["domain"],
++        $params["secure"], $params["httponly"]
++    	);
++	}
++    session_destroy();
+ 
+ }
+ 
+@@ -108,7 +136,7 @@ function &grabNewPage() {
+ 	return $returnArray;
+ }
+ 
+-// Start message functions -- 
++// Start message functions --
+ function messagePush( $pMessage ) {
+ 
+ 	$businessSession =& sessionGrab();
+@@ -159,7 +187,7 @@ function htmlEcho( $pPage ) {
+         if(isLoggedIn()){
+             $menuBlocks['vulnerabilities'] = array();
+             $session= sessionGrab();
+-            $menuBlocks['vulnerabilities'][] = array( 'id' => 'profile', 'name' => 'Profile', 'url' => 'profile.php?id='. $session['id'] );
++            $menuBlocks['vulnerabilities'][] = array( 'id' => 'profile', 'name' => 'Profile', 'url' => 'profile.php');
+             $menuBlocks['vulnerabilities'][] = array( 'id' => 'backend', 'name' => 'Add new Article', 'url' => 'backend.php' );
+             $menuBlocks['vulnerabilities'][] = array( 'id' => 'test', 'name' => 'Testarea', 'url' => 'designCheck.php' );
+             $menuBlocks['logout'] = array();
+@@ -184,25 +212,24 @@ function htmlEcho( $pPage ) {
+ 
+ 		$menuHtml .= "{$menuBlockHtml}";
+ 	}
+-        
++
+         $menuHtml .= '</ul>';
+         $city = 'Vienna';
+         if(isset($_POST['btnSubmit']))
+-            $city=$_POST['txtCity'];
++            $city=filter_var($_POST['txtCity'], FILTER_SANITIZE_STRING);
+         $menuHtml.="Get weather for your city:";
+-        
++
+         $menuHtml.="
+-    
++
+     <form enctype=\"multipart/form-data\" method=\"post\" name=\"userupdate\" onsubmit=\"return validate_form(this)\">
+-    
++
+     <input name=\"txtCity\" type=\"text\" size=\"30\">
+     <input name=\"btnSubmit\" type=\"submit\" value=\"Submit\" onClick=\"return checkForm();\"><br/>
+     </form>";
+-        
+-        $cmd = shell_exec( 'echo Weather report for:' . $city . ': ;shuf -i 0-40 -n 1; echo °C ' );
+-        
++
++        $cmd = "Weather report for:".$city.": ".rand(0,40)." °C";
+         $menuHtml.= $cmd;
+-	
++
+ 	// Send Headers + main HTML code
+ 	Header( 'Cache-Control: no-cache, must-revalidate');		// HTTP/1.1
+ 	Header( 'Content-Type: text/html;charset=utf-8' );		// TODO- proper XHTML headers...
+@@ -221,15 +248,15 @@ function htmlEcho( $pPage ) {
+ 		<link rel=\"stylesheet\" type=\"text/css\" href=\"".WEB_PAGE_TO_ROOT."css/main.css\" />
+ 
+ 	</head>
+-        
++
+ 
+ 	<body>
+-        
++
+ <div id=\"header\">
+                 	<div class=\"header\">
+ 			<div id=\"logo\">
+ 				<a href=\"index.php\"><img src=\"".WEB_PAGE_TO_ROOT."images/logo.jpg\" alt=\"\" /></a>
+-			</div>		
++			</div>
+ 			{$menuHtml}
+ 	</div>
+         </div>
+@@ -273,10 +300,12 @@ function databaseConnect1() {
+         global $_BUSINESS;
+         global $DBMS;
+         global $DBMS_connError;
++
+         try{
+-        	$pdo = PDO('mysql:host='.$_BUSINESS[ 'db_server' ].';dbname='.$_BUSINESS[ 'db_database' ].';charset=utf8', $_BUSINESS[ 'db_user' ], $_BUSINESS[ 'db_password' ]);
+-       		die("perkele1");
+-		return $pdo; 
++        	$pdo = new PDO('mysql:host='.$_BUSINESS[ 'db_server' ].';dbname='.$_BUSINESS[ 'db_database' ].';charset=utf8', $_BUSINESS[ 'db_user' ], $_BUSINESS[ 'db_password' ]);
++       		$pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
++			$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
++		return $pdo;
+ 	 }catch(PDOException $ex){
+ 		    die('ERROR!!!!!');
+ 		}
+@@ -294,49 +323,70 @@ function redirect( $pLocation ) {
+ 
+ 
+ function fetchArticles() {
+-    databaseConnect();
+-    $result = mysql_query("SELECT headline, created, published, id FROM article");
+-    
+-    $articles = '<lu>';
+-    
+-    while($row = mysql_fetch_row($result)){
+-        
+-        $curauth = mysql_query("SELECT first_name, last_name FROM users WHERE user_id =".$row[2]);
+-        $name = mysql_fetch_row($curauth);
+-        $articles .= "<li><h3>$row[1]<br /><a href=\"showArticle.php?id=$row[3]&comments=0\">$row[0]</a></h3><p>$name[0] $name[1]</p></li>";
+-    }
+-    
++	$pdo = databaseConnect1();
++	$stmt = $pdo->prepare("SELECT headline, created, published, id FROM article");
++	$stmt->execute();
++	$articles = '<lu>';
++	foreach ($stmt as $row) {
++	    $curauth = $pdo->prepare("SELECT first_name, last_name FROM users WHERE user_id = :uid");
++	    $curauth->execute(array('uid' => $row[2]));
++	    foreach ($curauth as $name) {
++	    	$articles .= "<li><h3>$row[1]<br /><a href=\"showArticle.php?id=$row[3]&comments=0\">$row[0]</a></h3><p>$name[0] $name[1]</p></li>";
++	    }
++	}
+     $articles .= '</lu>';
+     return $articles;
+ }
+ 
+ function fetchArticle($id, $commentson){
+-    databaseConnect();
+-    $result = mysql_fetch_row(mysql_query("SELECT id, headline, content, created, published FROM article where id=".$id));
+-    
+-    $curauth = mysql_fetch_row(mysql_query("SELECT first_name, last_name FROM users WHERE user_id =".$result[4]));
+-    
+-    $comments = mysql_query("SELECT user, comment FROM comments WHERE articleid =".$id);
+-    $num_comments = mysql_num_rows($comments);
+-     
++
++
++	$pdo = databaseConnect1();
++	$stmt = $pdo->prepare("SELECT id, headline, content, created, published FROM article where id=:id");
++	$stmt->execute(array('id' => $id));
++	$result;
++	foreach ($stmt as $res) {
++		$result = $res;
++		break;
++	}
++
++	$stmt = $pdo->prepare("SELECT first_name, last_name FROM users WHERE user_id = :uid");
++	$stmt->execute(array('uid' => $result[4]));
++	$curauth;
++	foreach ($stmt as $res) {
++		$curauth = $res;
++		break;
++	}
++
++	$comments = $pdo->prepare("SELECT user, comment FROM comments WHERE articleid = :id");
++	$comments->execute(array('id' => $id));
++	$num_comments=0;
++	foreach ($stmt as $res) {
++		$num_comments++;
++	}
++
++	///////////////////////////////////////////////////////////
++
+ //    $article = '<div id="body" class="header">';
+     $article= "<h3>$result[1]<br />$result[3]</h3><br />$result[2]<br />$curauth[1]";
+ //    $article.= '</div><div>';
+-    
++
+     if($commentson == 1)
+         $article.= "<p>Leave a comment below:</p>";
+-    
++
+     if($num_comments > 0) {
+-        while($row = mysql_fetch_row($comments)){
+-            $article.="<p>$row[0]<br />$row[1]</p>";
+-        }
++
++    	foreach ($comments as $row) {
++    		$article.="<p>$row[0]<br />$row[1]</p>";
++    	}
++
+     } else {
+         $article.="<p>There are no comments yet!</p>";
+     }
+-    
++
+  //   $article.='</div></br>';
+     if($commentson == 1)
+-    $article.="        
++    $article.="
+ <div class=\"featured\">
+ 		<form method=\"post\" name=\"guestform\">
+ 		Name *<input name=\"txtName\" type=\"text\" size=\"30\" maxlength=\"10\">
+@@ -345,26 +395,27 @@ function fetchArticle($id, $commentson){
+ 		<input name=\"btnSign\" type=\"submit\" value=\"Sign Guestbook\">
+ 		</form>
+     ";
+-    
++
+     return $article;
+ }
+ 
+ function postComment($message, $name, $id) {
+-    databaseConnect();
+-    $query = "INSERT INTO comments (comment,user,articleid) VALUES ('$message','$name','$id');";
+-   mysql_query($query);
++    $pdo = databaseConnect1();
++    $stmt = $pdo->prepare("INSERT INTO comments (comment,user,articleid) VALUES (:msg, :name, :id)");
++	$stmt->execute(array('msg' => $message, 'name' => $name, 'id' => $id));
+ }
+ 
+ function getAuthors() {
+-    databaseConnect();
+-    $result = mysql_query("SELECT user_id, user FROM users;");
+-    
++    $pdo = databaseConnect1();
++    $stmt = $pdo->prepare("SELECT user_id, user FROM users");
++	$stmt->execute();
++
+     $users = "<select name='user'>";
+-    
+-    while($row = mysql_fetch_row($result)){
++
++    foreach($stmt as $row){
+         $users .= "<option value='" . $row[0] . "'>" . $row[1] . "</option>";
+     }
+-    
++
+     $users .= '</select>';
+     return $users;
+ }
+diff --git a/login.php b/login.php
+index 236c392..eadcff2 100644
+--- a/login.php
++++ b/login.php
+@@ -15,11 +15,18 @@ if( isset( $_POST[ 'Login' ] ) ) {
+ 
+ 	$pass = $_POST[ 'password' ];
+ 
+-	$qry = "SELECT * FROM `users` WHERE user='" . $user . "' AND password='" . $pass. "';";
+-
+-	$result = @mysql_query($qry) or die('<pre>' . mysql_error() . '</pre>' );
++	$pdo = databaseConnect1();
++	$stmt = $pdo->prepare('SELECT password FROM users WHERE user = :user');
++	$stmt->execute(array('user' => $user));
++	$correct=0;
++	foreach ($stmt as $row) {
++	    if (password_verify($pass, $row[0])){
++	    	$correct = 1;
++	    	break;
++	    }
++	}
+ 
+-	if( $result && mysql_num_rows( $result ) >= 1 ) {	// Login Successful...
++	if( $correct == 1 ) {	// Login Successful...
+ 
+ 		messagePush( "You have logged in as '".$user."'" );
+ 		login( $user );
+@@ -59,33 +66,33 @@ echo "
+ 	<body>
+ 
+ 	<div align=\"center\">
+-	
++
+ 	<br />
+ 
+ 	<p><img src=\"".WEB_PAGE_TO_ROOT."images/login_logo.png\" /></p>
+ 
+ 	<br />
+-	
++
+ 	<form action=\"login.php\" method=\"post\">
+-	
++
+ 	<fieldset>
+ 
+ 			<label for=\"user\">Username</label> <input type=\"text\" class=\"loginInput\" size=\"20\" name=\"username\"><br />
+-	
+-			
++
++
+ 			<label for=\"pass\">Password</label> <input type=\"password\" class=\"loginInput\" AUTOCOMPLETE=\"off\" size=\"20\" name=\"password\"><br />
+-			
++
+ 			<input type=\"hidden\" name=\"redirect\" value=".$_GET['redirect'].">
+ 			<p class=\"submit\"><input type=\"submit\" value=\"Login\" name=\"Login\"></p>
+ 
+ 	</fieldset>
+ 
+ 	</form>
+-	
++
+ 	<br />
+ 
+ 	{$messagesHtml}
+-	
++
+ 	</div> <!-- end align div -->
+ 
+ 	</body>
+diff --git a/profile.php b/profile.php
+index 40d65b3..819a86d 100644
+--- a/profile.php
++++ b/profile.php
+@@ -3,29 +3,55 @@
+ define( 'WEB_PAGE_TO_ROOT', '' );
+ 
+ require_once WEB_PAGE_TO_ROOT.'includes/businessPage.inc.php';
+-
++$pw_hash="";
++global $_SESSION;
+ startup( array( 'authenticated', 'redirect'=>'profile.php' ) );
+-        
+-	if (isset($_POST['btnSubmit'])) {
+-                
+-                databaseConnect();
+-                
+-                $res=mysql_query("SELECT first_name, last_name, user, password FROM users WHERE user_id =".$_GET['id']);
+-                $num_results = mysql_num_rows($res); 
+-                if($num_results > 0) {
+-                    $query = "UPDATE users SET first_name='" . $_POST['txtFirst'] . "', last_name='" . $_POST['txtLast'] . "', user='" . $_POST['txtUser'] . "', password='" . $_POST['txtPass'] . "' WHERE user_id = ".$_GET['id'];
+-                } else {
+-                    $query = "INSERT INTO users (first_name,last_name,user,password) VALUES ('".$_POST['txtFirst']."','".$_POST['txtLast']."','".$_POST['txtUser']."','".$_POST['txtPass']."');";
++
++	if (isset($_POST['btnSubmit']) && $_POST['CSRFToken']==$_SESSION['TOKEN']) {
++
++
++                $pdo = databaseConnect1();
++
++                $stmt = $pdo->prepare('SELECT password FROM users WHERE user_id = :user');
++                $stmt->execute(array('user' => sessionGrab()['id']));
++                $correct=0;
++                foreach ($stmt as $row) {
++                    if (password_verify($_POST['txtOldPass'], $row[0])){
++                        $correct = 1;
++                        break;
++                    }
+                 }
+-                mysql_query($query) or die('<pre>' . mysql_error() . '</pre>' );
+ 
++                if( $correct == 1 ) {   // Login Successful...
++
++
++                    $stmt = $pdo->prepare("SELECT first_name, last_name, user, password FROM users WHERE user_id = :uid");
++                    $stmt->execute(array('uid' => sessionGrab()['id']));
++                    $num_results=0;
++                    foreach ($stmt as $row) {
++                        $num_results++;
++                    }
++
++                    $pw_hash = password_hash($_POST['txtPass'], PASSWORD_DEFAULT);
++                    if($num_results > 0) {
++                        $stmt = $pdo->prepare("UPDATE users SET first_name=:txtFirst, last_name=:txtLast, user=:txtUser, password=:password WHERE user_id = :uid");
++                        $stmt->execute(array('txtFirst' => $_POST['txtFirst'],'txtLast' => $_POST['txtLast'],'txtUser' => $_POST['txtUser'],'password' => $pw_hash,'uid' => sessionGrab()['id']));
++                    } else {
++                        $stmt = "INSERT INTO users (first_name,last_name,user,password) VALUES (first_name=:txtFirst, last_name=:txtLast, user=:txtUser, password=:password)";
++                        $stmt->execute(array('txtFirst' => $_POST['txtFirst'], 'txtLast' => $_POST['txtLast'], 'txtUser' => $_POST['txtUser'], 'password' => $pw_hash));
++                    }
++                }
+ 		}
+ $profile = "";
++$pdo = databaseConnect1();
++$stmt = $pdo->prepare("SELECT first_name, last_name, user, password FROM users WHERE user_id = :uid");
++$stmt->execute(array('uid' => sessionGrab()['id']));
+ 
+-if(isset($_GET['id'])) {
+-    databaseConnect();
+-    $profile = mysql_fetch_row(mysql_query("SELECT first_name, last_name, user, password FROM users WHERE user_id =".$_GET['id']));
++foreach ($stmt as $row) {
++    $profile=$row;// do something with $row
++    break;
+ }
++
+ $page = grabNewPage();
+ 
+ $page[ 'title' ] .= $page[ 'title_separator' ].'Welcome';
+@@ -34,15 +60,15 @@ $page[ 'page_id' ] = 'home';
+ 
+ $page[ 'body' ] .= "This is your user Profile<br />
+     Feel free to make changes below:<br />
+-    
+     <form enctype=\"multipart/form-data\" method=\"post\" name=\"userupdate\">
+-    
+     First Name *<br /><input name=\"txtFirst\" type=\"text\" size=\"30\" maxlength=\"15\" value=\"". $profile[0] . "\"><br/>
+     Last Name *<br /><input name=\"txtLast\" type=\"text\" size=\"30\" maxlength=\"15\" value=\"". $profile[1] . "\"><br/>
+     Username *<br /><input name=\"txtUser\" type=\"text\" size=\"30\" maxlength=\"15\" value=\"". $profile[2] . "\"><br/>
+-    Password *<br /><input name=\"txtPass\" type=\"text\" size=\"30\" maxlength=\"32\" value=\"". $profile[3] . "\"><br/>
++    New Password *<br /><input name=\"txtPass\" type=\"password\" size=\"30\" maxlength=\"32\" value=\"\"><br/>
++    Old Password *<br /><input name=\"txtOldPass\" type=\"password\" size=\"30\" maxlength=\"32\" value=\"\"><br/>
++    <input type=\"hidden\" name=\"CSRFToken\" value=\"".$_SESSION['TOKEN']."\">
+     <input name=\"btnSubmit\" type=\"submit\" value=\"Submit\"><br/>
+-    
++
+     </form>
+ ";
+ 
+diff --git a/redirect.php b/redirect.php
+deleted file mode 100644
+index 4fe1b0d..0000000
+--- a/redirect.php
++++ /dev/null
+@@ -1,10 +0,0 @@
+-<?php
+-function startsWith($haystack, $needle)
+-{
+-    return !strncmp($haystack, $needle, strlen($needle));
+-}
+-if(!startsWith($_GET['url'],'http'))
+-    $_GET['url'] = 'http://' . $_GET['url'];
+-$redirect_url = $_GET['url'];
+-header("Location: " . $redirect_url);
+-?>

